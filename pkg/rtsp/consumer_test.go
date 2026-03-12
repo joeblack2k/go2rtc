@@ -84,3 +84,43 @@ func TestConnWrapPacketHandlerAACPassthrough(t *testing.T) {
 	require.Equal(t, uint32(5678), packets[0].Timestamp)
 	require.Equal(t, uint32(90), packets[0].SSRC)
 }
+
+func TestConnWrapPacketHandlerH264RepackWaitsForKeyframe(t *testing.T) {
+	codec := &core.Codec{
+		Name:        core.CodecH264,
+		ClockRate:   90000,
+		PayloadType: 96,
+	}
+
+	var packets []*rtp.Packet
+	conn := &Conn{Repack: true}
+	handler := conn.wrapPacketHandler(codec, func(packet *rtp.Packet) {
+		clone := *packet
+		clone.Payload = append([]byte(nil), packet.Payload...)
+		packets = append(packets, &clone)
+	})
+
+	handler(&rtp.Packet{
+		Header: rtp.Header{
+			Version:        2,
+			SequenceNumber: 10,
+			Timestamp:      1000,
+			Marker:         true,
+		},
+		Payload: []byte{0x41, 0x9a},
+	})
+
+	require.Len(t, packets, 0)
+
+	handler(&rtp.Packet{
+		Header: rtp.Header{
+			Version:        2,
+			SequenceNumber: 11,
+			Timestamp:      4000,
+			Marker:         true,
+		},
+		Payload: []byte{0x65, 0x88},
+	})
+
+	require.NotEmpty(t, packets)
+}

@@ -177,9 +177,15 @@ func (c *Conn) wrapPacketHandler(codec *core.Codec, handlerFunc core.HandlerFunc
 		switch codec.Name {
 		case core.CodecH264:
 			handlerFunc = h264.RTPPay(c.PacketSize, handlerFunc)
+			if c.Repack {
+				handlerFunc = waitH264Keyframe(handlerFunc)
+			}
 			handlerFunc = h264.RTPDepay(codec, handlerFunc)
 		case core.CodecH265:
 			handlerFunc = h265.RTPPay(c.PacketSize, handlerFunc)
+			if c.Repack {
+				handlerFunc = waitH265Keyframe(handlerFunc)
+			}
 			handlerFunc = h265.RTPDepay(codec, handlerFunc)
 		case core.CodecAAC:
 			handlerFunc = aac.RTPPay(handlerFunc)
@@ -188,6 +194,36 @@ func (c *Conn) wrapPacketHandler(codec *core.Codec, handlerFunc core.HandlerFunc
 	}
 
 	return handlerFunc
+}
+
+func waitH264Keyframe(handlerFunc core.HandlerFunc) core.HandlerFunc {
+	var synced bool
+
+	return func(packet *rtp.Packet) {
+		if !synced {
+			if !h264.IsKeyframe(packet.Payload) {
+				return
+			}
+			synced = true
+		}
+
+		handlerFunc(packet)
+	}
+}
+
+func waitH265Keyframe(handlerFunc core.HandlerFunc) core.HandlerFunc {
+	var synced bool
+
+	return func(packet *rtp.Packet) {
+		if !synced {
+			if !h265.IsKeyframe(packet.Payload) {
+				return
+			}
+			synced = true
+		}
+
+		handlerFunc(packet)
+	}
 }
 
 func (c *Conn) writeInterleavedData(data []byte) error {

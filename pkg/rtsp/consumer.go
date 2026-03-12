@@ -148,6 +148,12 @@ func (c *Conn) packetWriter(codec *core.Codec, channel, payloadType uint8) core.
 		flushBuf()
 	}
 
+	handlerFunc = c.wrapPacketHandler(codec, handlerFunc)
+
+	return handlerFunc
+}
+
+func (c *Conn) wrapPacketHandler(codec *core.Codec, handlerFunc core.HandlerFunc) core.HandlerFunc {
 	if !codec.IsRTP() {
 		switch codec.Name {
 		case core.CodecH264:
@@ -159,9 +165,15 @@ func (c *Conn) packetWriter(codec *core.Codec, channel, payloadType uint8) core.
 		case core.CodecJPEG:
 			handlerFunc = mjpeg.RTPPay(handlerFunc)
 		}
-	} else if codec.Name == core.CodecPCML {
+		return handlerFunc
+	}
+
+	if codec.Name == core.CodecPCML {
 		handlerFunc = pcm.LittleToBig(handlerFunc)
-	} else if c.PacketSize != 0 {
+		return handlerFunc
+	}
+
+	if c.Repack || c.PacketSize != 0 {
 		switch codec.Name {
 		case core.CodecH264:
 			handlerFunc = h264.RTPPay(c.PacketSize, handlerFunc)
@@ -169,6 +181,9 @@ func (c *Conn) packetWriter(codec *core.Codec, channel, payloadType uint8) core.
 		case core.CodecH265:
 			handlerFunc = h265.RTPPay(c.PacketSize, handlerFunc)
 			handlerFunc = h265.RTPDepay(codec, handlerFunc)
+		case core.CodecAAC:
+			handlerFunc = aac.RTPPay(handlerFunc)
+			handlerFunc = aac.RTPDepay(handlerFunc)
 		}
 	}
 

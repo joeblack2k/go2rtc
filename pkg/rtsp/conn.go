@@ -27,6 +27,7 @@ type Conn struct {
 	Media       string
 	OnClose     func() error
 	PacketSize  uint16
+	Repack      bool
 	SessionName string
 	Timeout     int
 	Transport   string // custom transport support, ex. RTSP over WebSocket

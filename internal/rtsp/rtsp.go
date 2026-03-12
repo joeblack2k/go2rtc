@@ -206,6 +206,11 @@ func tcpHandler(conn *rtsp.Conn) {
 				conn.PacketSize = uint16(core.Atoi(s))
 			}
 
+			switch query.Get("repack") {
+			case "1", "true", "yes", "on":
+				conn.Repack = true
+			}
+
 			// param name like ffmpeg style https://ffmpeg.org/ffmpeg-protocols.html
 			if s := query.Get("log_level"); s != "" {
 				if lvl, err := zerolog.ParseLevel(s); err == nil {

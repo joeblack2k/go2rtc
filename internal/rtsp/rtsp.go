@@ -99,13 +99,7 @@ func rtspHandler(rawURL string) (core.Producer, error) {
 	conn.Backchannel = true
 	conn.UserAgent = app.UserAgent
 
-	if rawQuery != "" {
-		query := streams.ParseQuery(rawQuery)
-		conn.Backchannel = query.Get("backchannel") == "1"
-		conn.Media = query.Get("media")
-		conn.Timeout = core.Atoi(query.Get("timeout"))
-		conn.Transport = query.Get("transport")
-	}
+	applyClientQuery(conn, rawURL, rawQuery)
 
 	if log.Trace().Enabled() {
 		conn.Listen(func(msg any) {
@@ -141,6 +135,27 @@ func rtspHandler(rawURL string) (core.Producer, error) {
 	}
 
 	return conn, nil
+}
+
+func applyClientQuery(conn *rtsp.Conn, rawURL, rawQuery string) {
+	query := url.Values{}
+
+	if uri, err := url.Parse(rawURL); err == nil && uri != nil {
+		for key, values := range uri.Query() {
+			query[key] = append([]string(nil), values...)
+		}
+	}
+
+	if extra := streams.ParseQuery(rawQuery); extra != nil {
+		for key, values := range extra {
+			query[key] = append([]string(nil), values...)
+		}
+	}
+
+	conn.Backchannel = query.Get("backchannel") == "1"
+	conn.Media = query.Get("media")
+	conn.Timeout = core.Atoi(query.Get("timeout"))
+	conn.Transport = query.Get("transport")
 }
 
 func tcpHandler(conn *rtsp.Conn) {
